@@ -33,8 +33,8 @@ sub new {
     my ($class, %options) = @_;
 
     my $self = {
-        queue_name  => $options{name}   || 'log4perl',
-        server      => $options{server} || 'localhost:6379',
+        queue_name  => $options{queue_name} || 'log4perl',
+        server      => $options{server}     || 'localhost:6379',
         flush_on    => $options{flush_on},
         _redis_conn => undef,
         _buffer     => [],
@@ -71,6 +71,7 @@ sub log {
     if ($self->{flush_on}) {
         if ($params{log4p_level} eq $self->{flush_on}) {
             $redis->lpush($self->{queue_name}, join('', @{$self->{_buffer}}));
+            $self->{_buffer} = [];
         } else {
             push @{$self->{_buffer}} => $params{message};
         }
