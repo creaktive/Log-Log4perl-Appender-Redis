@@ -70,7 +70,7 @@ sub log {
 
     if ($self->{flush_on}) {
         if ($params{log4p_level} eq $self->{flush_on}) {
-            $redis->lpush($self->{queue_name}, join("\n", @{$self->{_buffer}}));
+            $redis->lpush($self->{queue_name}, join('', @{$self->{_buffer}}));
         } else {
             push @{$self->{_buffer}} => $params{message};
         }
