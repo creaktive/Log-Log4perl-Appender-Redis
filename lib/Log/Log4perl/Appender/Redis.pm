@@ -15,8 +15,10 @@ use strict;
 use utf8;
 use warnings qw(all);
 
+use Carp qw(croak);
 use Redis;
 
+## no critic (ProhibitExplicitISA)
 our @ISA = qw(Log::Log4perl::Appender);
 
 # VERSION
@@ -46,6 +48,7 @@ sub new {
 #
 # =cut
 
+## no critic (ProhibitBuiltinHomonyms)
 sub log {
     my ($self, %params) = @_;
 
@@ -58,7 +61,7 @@ sub log {
         );
 
         unless ($redis->ping) {
-            die('Connection to ', $self->{server}, " failed: $!");
+            croak 'Connection to ', $self->{server}, " failed: $!";
         }
 
         $self->{_redis_conn} = $redis;
@@ -69,6 +72,7 @@ sub log {
 
 =for Pod::Coverage
 DESTROY
+log
 =cut
 
 sub DESTROY {
