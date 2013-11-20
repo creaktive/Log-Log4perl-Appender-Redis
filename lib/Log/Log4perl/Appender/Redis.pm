@@ -35,8 +35,9 @@ sub new {
     my $self = {
         queue_name  => $options{name}   || 'log4perl',
         server      => $options{server} || 'localhost:6379',
+        flush_on    => $options{flush_on},
         _redis_conn => undef,
-        %options
+        _buffer     => [],
     };
 
     return bless $self => $class;
@@ -67,7 +68,17 @@ sub log {
         $self->{_redis_conn} = $redis;
     }
 
-    return $redis->lpush($self->{queue_name}, $params{message});
+    if ($self->{flush_on}) {
+        if ($params{log4p_level} eq $self->{flush_on}) {
+            $redis->lpush($self->{queue_name}, join("\n", @{$self->{_buffer}}));
+        } else {
+            push @{$self->{_buffer}} => $params{message};
+        }
+    } else {
+        $redis->lpush($self->{queue_name}, $params{message});
+    }
+
+    return;
 }
 
 =for Pod::Coverage
