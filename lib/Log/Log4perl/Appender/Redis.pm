@@ -49,7 +49,7 @@ sub new {
 
     my $levels = join '|' => values %Log::Log4perl::Level::LEVELS;
     $self->{flush_on} = uc $self->{flush_on};
-    if ($self->{flush_on} !~ /^(?:$levels)$/ix) {
+    if ($self->{flush_on} and $self->{flush_on} !~ /^(?:$levels)$/ix) {
         croak 'Unknown log level: ', $self->{flush_on};
     }
 
@@ -104,7 +104,9 @@ sub DESTROY {
 
     my $redis = $self->{_redis_conn};
     if ($redis) {
-        $redis->lpush($self->{queue_name}, join('', @{$self->{_buffer}}));
+        $redis->lpush($self->{queue_name}, join('', @{$self->{_buffer}}))
+            if $self->{flush_on} and @{$self->{_buffer}};
+
         $redis->quit;
     }
 
