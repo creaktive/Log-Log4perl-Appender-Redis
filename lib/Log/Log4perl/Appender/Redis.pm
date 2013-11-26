@@ -16,6 +16,8 @@ use utf8;
 use warnings qw(all);
 
 use Carp qw(croak);
+use Encode;
+use IO::Compress::Gzip qw(gzip $GzipError);
 use Redis;
 
 ## no critic (ProhibitExplicitISA)
@@ -43,9 +45,11 @@ sub new {
     $self->{queue_name} = delete $options{queue_name}   || $name;
     $self->{flush_on}   = delete $options{flush_on}     || '';
     $self->{wrap}       = delete $options{wrap}         || 1000;
+    $self->{gzip}       = delete $options{gzip};
 
     $self->{_redis_opts} = \%options;
     $self->{_redis_opts}{server} ||= 'localhost:6379';
+    $self->{_redis_opts}{encoding} = undef;
 
     my $levels = join '|' => values %Log::Log4perl::Level::LEVELS;
     $self->{flush_on} = uc $self->{flush_on};
@@ -85,14 +89,30 @@ sub log {
         push @{$self->{_buffer}} => $params{message};
 
         if ($params{log4p_level} eq $self->{flush_on}) {
-            $redis->lpush($self->{queue_name}, join('', @{$self->{_buffer}}));
+            $redis->lpush($self->{queue_name}, $self->_pack(@{$self->{_buffer}}));
             $self->{_buffer} = [];
         }
     } else {
-        $redis->lpush($self->{queue_name}, $params{message});
+        $redis->lpush($self->{queue_name}, $self->_pack($params{message}));
     }
 
     return;
+}
+
+sub _pack {
+    my ($self, @buffer) = @_;
+
+    my $buffer = encode_utf8(join('', @buffer));
+    if (defined $self->{gzip}) {
+        my $gzipped;
+        gzip(
+            $buffer => $gzipped,
+            -Level  => $self->{gzip},
+        ) or croak 'gzip failed: ' . $GzipError;
+        $buffer = $gzipped;
+    }
+
+    return $buffer;
 }
 
 =for Pod::Coverage
@@ -104,7 +124,7 @@ sub DESTROY {
 
     my $redis = $self->{_redis_conn};
     if ($redis) {
-        $redis->lpush($self->{queue_name}, join('', @{$self->{_buffer}}))
+        $redis->lpush($self->{queue_name}, $self->compress(@{$self->{_buffer}}))
             if $self->{flush_on} and @{$self->{_buffer}};
 
         $redis->quit;
